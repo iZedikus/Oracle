@@ -1,0 +1,256 @@
+oracle/
+│
+├── pom.xml
+│
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── ru/example/oracle/
+│   │   │       │
+│   │   │       ├── OracleApplication.java
+│   │   │       │   @SpringBootApplication — точка входа
+│   │   │       │
+│   │   │       │── ══════════════════════════════════════════
+│   │   │       │   DOMAIN LAYER
+│   │   │       │── ══════════════════════════════════════════
+│   │   │       │
+│   │   │       ├── domain/
+│   │   │       │   │
+│   │   │       │   ├── model/
+│   │   │       │   │   │
+│   │   │       │   │   ├── incomingtransaction/          ← Подпакет «IncomingTransaction»
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── IncomingTransaction.java  ← AggregateRoot
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     incomingTransactionID: UUID
+│   │   │       │   │   │   │     externalTransactionID: String
+│   │   │       │   │   │   │     watchProfileID: UUID
+│   │   │       │   │   │   │     status: IncomingTransactionStatus
+│   │   │       │   │   │   │     data: TransactionData          [Composition]
+│   │   │       │   │   │   │     receivedAt: Instant
+│   │   │       │   │   │   │     processedAt: Instant
+│   │   │       │   │   │   │   Методы (public):
+│   │   │       │   │   │   │     markProcessing()
+│   │   │       │   │   │   │     markMatched()
+│   │   │       │   │   │   │     markUnmatched()
+│   │   │       │   │   │   │     markError(message: String)
+│   │   │       │   │   │   │   Фабричный метод (static):
+│   │   │       │   │   │   │     receive(externalTransactionID, watchProfileID,
+│   │   │       │   │   │   │             data): IncomingTransaction
+│   │   │       │   │   │   │     → создаёт объект со статусом Received,
+│   │   │       │   │   │   │       устанавливает receivedAt = Instant.now()
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── TransactionData.java      ← Value Object (Embeddable)
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     creditDebitIndicator: CreditDebitCode
+│   │   │       │   │   │   │     mcc: String
+│   │   │       │   │   │   │     merchantName: String
+│   │   │       │   │   │   │     merchantID: String
+│   │   │       │   │   │   │     amount: String
+│   │   │       │   │   │   │     currency: String
+│   │   │       │   │   │   │     bookingDateTime: Instant
+│   │   │       │   │   │   │     valueDateTime: Instant
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── IncomingTransactionStatus.java ← Enum
+│   │   │       │   │   │   │   Received, Processing, Matched, Unmatched, Error
+│   │   │       │   │   │   │
+│   │   │       │   │   │   └── CreditDebitCode.java      ← Enum (локальный для домена)
+│   │   │       │   │   │       Credit, Debit
+│   │   │       │   │   │
+│   │   │       │   │   ├── watchprofile/                 ← Подпакет «WatchProfile»
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── WatchProfile.java         ← AggregateRoot
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     watchProfileID: UUID
+│   │   │       │   │   │   │     externalUserID: UUID
+│   │   │       │   │   │   │     watchProfileStatus: WatchProfileStatus
+│   │   │       │   │   │   │     rules: List<ActiveRule>          [Composition]
+│   │   │       │   │   │   │     registeredAt: Instant
+│   │   │       │   │   │   │     updatedAt: Instant
+│   │   │       │   │   │   │     lastEventAt: Instant
+│   │   │       │   │   │   │   Методы (public):
+│   │   │       │   │   │   │     register(userID: UUID)
+│   │   │       │   │   │   │     pause()
+│   │   │       │   │   │   │     resume()
+│   │   │       │   │   │   │     terminate()
+│   │   │       │   │   │   │     addRule(rule: ActiveRule)
+│   │   │       │   │   │   │     updateRule(rule: ActiveRule)
+│   │   │       │   │   │   │     removeRule(ruleID: UUID)
+│   │   │       │   │   │   │     findActiveRules(): List<ActiveRule>
+│   │   │       │   │   │   │     recordEvent(at: Instant)
+│   │   │       │   │   │   │   Фабричный метод (static):
+│   │   │       │   │   │   │     create(externalUserID, externalUserScenarioID,
+│   │   │       │   │   │   │            scenarioTypeCode, rules,
+│   │   │       │   │   │   │            ruleVersion): WatchProfile
+│   │   │       │   │   │   │     → статус Active, порождает WatchProfileRegisteredEvent
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── ActiveRule.java           ← Entity (владеет условиями)
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     activeRuleID: UUID
+│   │   │       │   │   │   │     externalUserScenarioID: UUID
+│   │   │       │   │   │   │     scenarioTypeCode: String
+│   │   │       │   │   │   │     version: int
+│   │   │       │   │   │   │     isEnabled: boolean
+│   │   │       │   │   │   │     conditions: List<RuleCondition>  [Composition]
+│   │   │       │   │   │   │     registeredAt: Instant
+│   │   │       │   │   │   │     updatedAt: Instant
+│   │   │       │   │   │   │   Методы (public):
+│   │   │       │   │   │   │     enable()
+│   │   │       │   │   │   │     disable()
+│   │   │       │   │   │   │     updateConditions(conditions: List<RuleCondition>,
+│   │   │       │   │   │   │                      version: int)
+│   │   │       │   │   │   │     isApplicable(): boolean
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── RuleCondition.java        ← Value Object
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     conditionID: UUID
+│   │   │       │   │   │   │     field: RuleField
+│   │   │       │   │   │   │     operator: RuleOperator
+│   │   │       │   │   │   │     value: String
+│   │   │       │   │   │   │   Методы (public):
+│   │   │       │   │   │   │     evaluate(transaction: IncomingTransaction): boolean
+│   │   │       │   │   │   │     → реализует логику: Equals, NonEquals, Contains, In
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── WatchProfileStatus.java   ← Enum
+│   │   │       │   │   │   │   Active, Paused, Terminated
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── RuleField.java            ← Enum
+│   │   │       │   │   │   │   MCC, MerchantName, MerchantID, CreditDebitIndicator
+│   │   │       │   │   │   │
+│   │   │       │   │   │   └── RuleOperator.java         ← Enum
+│   │   │       │   │   │       Equals, NonEquals, Contains, In
+│   │   │       │   │   │
+│   │   │       │   │   ├── matchattempt/                 ← Подпакет «MatchAttempt»
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── MatchAttempt.java         ← AggregateRoot
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     matchAttemptID: UUID
+│   │   │       │   │   │   │     incomingTransactionID: UUID
+│   │   │       │   │   │   │     watchAccountID: UUID
+│   │   │       │   │   │   │     result: MatchingResult
+│   │   │       │   │   │   │     snapshots: List<ConditionSnapshot>  [Composition]
+│   │   │       │   │   │   │     attemptedAt: Instant
+│   │   │       │   │   │   │   Фабричный метод (static):
+│   │   │       │   │   │   │     attempt(transaction: IncomingTransaction,
+│   │   │       │   │   │   │             rule: ActiveRule): MatchAttempt
+│   │   │       │   │   │   │     → вычисляет все RuleCondition.evaluate(),
+│   │   │       │   │   │   │       сохраняет ConditionSnapshot для каждого условия,
+│   │   │       │   │   │   │       выставляет result (Matched/Unmatched/Error),
+│   │   │       │   │   │   │       при Matched порождает TransactionMatchedEvent
+│   │   │       │   │   │   │
+│   │   │       │   │   │   ├── ConditionSnapshot.java    ← Value Object (Embeddable)
+│   │   │       │   │   │   │   Поля (private):
+│   │   │       │   │   │   │     expectedValue: String
+│   │   │       │   │   │   │     actualValue: String
+│   │   │       │   │   │   │     passed: boolean
+│   │   │       │   │   │   │
+│   │   │       │   │   │   └── MatchingResult.java       ← Enum
+│   │   │       │   │   │       Matched, Unmatched, Error
+│   │   │       │   │   │
+│   │   │       │   │   └── triggerevent/                 ← Подпакет «TriggerEvent»
+│   │   │       │   │       │
+│   │   │       │   │       ├── TriggerEvent.java         ← AggregateRoot
+│   │   │       │   │       │   Поля (private):
+│   │   │       │   │       │     triggerEventID: UUID
+│   │   │       │   │       │     matchAttemptID: UUID
+│   │   │       │   │       │     externalUserScenarioID: UUID
+│   │   │       │   │       │     externalUserID: UUID
+│   │   │       │   │       │     deliveryStatus: TriggerEventDeliveryStatus
+│   │   │       │   │       │     payload: TriggerPayload              [Composition]
+│   │   │       │   │       │     deliveryAttempts: List<DeliveryAttempt> [Composition]
+│   │   │       │   │       │     retryCount: int
+│   │   │       │   │       │     scheduledAt: Instant
+│   │   │       │   │       │     deliveredAt: Instant
+│   │   │       │   │       │     lastRetryAt: Instant
+│   │   │       │   │       │   Методы (public):
+│   │   │       │   │       │     scheduleDelivery()
+│   │   │       │   │       │     markDelivered()
+│   │   │       │   │       │       → порождает TriggerEventDeliveredEvent
+│   │   │       │   │       │     markFailed(message: String)
+│   │   │       │   │       │     scheduleRetry()
+│   │   │       │   │       │     isExhausted(): boolean
+│   │   │       │   │       │       → при true порождает TriggerEventExhaustedEvent
+│   │   │       │   │       │   Фабричный метод (static):
+│   │   │       │   │       │     create(matchAttempt: MatchAttempt,
+│   │   │       │   │       │            watchProfile: WatchProfile): TriggerEvent
+│   │   │       │   │       │
+│   │   │       │   │       ├── TriggerPayload.java       ← Value Object (Embeddable)
+│   │   │       │   │       │   Поля (private):
+│   │   │       │   │       │     triggerTransactionID: String
+│   │   │       │   │       │     matchedMCC: String
+│   │   │       │   │       │     matchedMerchantName: String
+│   │   │       │   │       │     matchedAmount: String
+│   │   │       │   │       │     matchedCurrency: String
+│   │   │       │   │       │     scenarioTypeCode: String
+│   │   │       │   │       │     occuredAt: Instant
+│   │   │       │   │       │
+│   │   │       │   │       ├── DeliveryAttempt.java      ← Value Object (ElementCollection)
+│   │   │       │   │       │   Поля (private):
+│   │   │       │   │       │     attemptNumber: int
+│   │   │       │   │       │     attemptedAt: Instant
+│   │   │       │   │       │     success: boolean
+│   │   │       │   │       │     httpStatus: int
+│   │   │       │   │       │     errorMessage: String
+│   │   │       │   │       │
+│   │   │       │   │       └── TriggerEventDeliveryStatus.java ← Enum
+│   │   │       │   │           Pending, Delivered, Retrying, Failed
+│   │   │       │   │
+│   │   │       │   ├── event/                            ← Доменные события
+│   │   │       │   │   │
+│   │   │       │   │   ├── DomainEvent.java              ← sealed abstract base
+│   │   │       │   │   │   Поля: eventID: UUID, occurredAt: Instant
+│   │   │       │   │   │
+│   │   │       │   │   ├── TransactionMatchedEvent.java
+│   │   │       │   │   │   Поля (private):
+│   │   │       │   │   │     matchAttemptID: UUID
+│   │   │       │   │   │     watchProfileID: UUID
+│   │   │       │   │   │     incomingTransactionID: UUID
+│   │   │       │   │   │     matchedRuleID: UUID
+│   │   │       │   │   │     occuredAt: Instant
+│   │   │       │   │   │   → порождается в MatchAttempt при результате Matched
+│   │   │       │   │   │
+│   │   │       │   │   ├── TriggerEventDeliveredEvent.java
+│   │   │       │   │   │   Поля (public):
+│   │   │       │   │   │     triggerEventID: UUID
+│   │   │       │   │   │     externalUserScenarioID: UUID
+│   │   │       │   │   │     occuredAt: Instant
+│   │   │       │   │   │   → порождается в TriggerEvent.markDelivered()
+│   │   │       │   │   │
+│   │   │       │   │   ├── TriggerEventExhaustedEvent.java
+│   │   │       │   │   │   Поля (public):
+│   │   │       │   │   │     triggerEventID: UUID
+│   │   │       │   │   │     retryCount: int
+│   │   │       │   │   │     occuredAt: Instant
+│   │   │       │   │   │   → порождается в TriggerEvent.isExhausted() == true
+│   │   │       │   │   │
+│   │   │       │   │   └── WatchProfileRegisteredEvent.java
+│   │   │       │   │       Поля (public):
+│   │   │       │   │         watchProfileID: UUID
+│   │   │       │   │         externalUserID: UUID
+│   │   │       │   │         occuredAt: Instant
+│   │   │       │   │       → порождается в WatchProfile.create()
+│   │   │       │   │
+│   │   │       │   └── repository/                       ← Порты (интерфейсы)
+│   │   │       │       ├── IncomingTransactionRepository.java
+│   │   │       │       │   save(tx: IncomingTransaction)
+│   │   │       │       │   findById(id: UUID): Optional<IncomingTransaction>
+│   │   │       │       │   findByExternalTransactionID(id: String):
+│   │   │       │       │       Optional<IncomingTransaction>
+│   │   │       │       │
+│   │   │       │       ├── WatchProfileRepository.java
+│   │   │       │       │   save(profile: WatchProfile)
+│   │   │       │       │   findById(id: UUID): Optional<WatchProfile>
+│   │   │       │       │   findByExternalUserID(userID: UUID): Optional<WatchProfile>
+│   │   │       │       │   findByExternalUserScenarioID(scenarioID: UUID):
+│   │   │       │       │       Optional<WatchProfile>
+│   │   │       │       │
+│   │   │       │       ├── MatchAttemptRepository.java
+│   │   │       │       │   save(attempt: MatchAttempt)
+│   │   │       │       │   findById(id: UUID): Optional<MatchAttempt>
+│   │   │       │       │   findByIncomingTransactionID(txID: UUID): List<MatchAttempt>
+│   │   │       │       │
+│   │   │       │       └── TriggerEventRepository.java
+│   │   │       │           save(event: TriggerEvent)
+│   │   │       │           findById(id: UUID): Optional<TriggerEvent>
+│   │   │       │           findPendingForRetry(): List<TriggerEvent>
+│   │   │       │             → статусы Pending/Retrying и scheduledAt <= now

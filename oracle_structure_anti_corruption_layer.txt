@@ -1,0 +1,44 @@
+oracle/
+│
+├── pom.xml
+│
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── ru/example/oracle/
+│   │   │       │
+│   │   │       ├── OracleApplication.java
+│   │   │       │   @SpringBootApplication — точка входа
+│   │   │       │
+│   │   │       │── ══════════════════════════════════════════
+│   │   │       │   ANTI-CORRUPTION LAYER
+│   │   │       │── ══════════════════════════════════════════
+│   │   │       │
+│   │   │       ├── acl/
+│   │   │       │   │
+│   │   │       │   ├── dto/
+│   │   │       │   │   └── OpenBankingTransactionDto.java
+│   │   │       │   │       Поля (все public):
+│   │   │       │   │         messageId: UUID
+│   │   │       │   │         occurredAt: String
+│   │   │       │   │         transactionId: String
+│   │   │       │   │         accountId: String
+│   │   │       │   │         paymentToken: String
+│   │   │       │   │         amount: String
+│   │   │       │   │         currency: String
+│   │   │       │   │         creditDebitIndicator: String
+│   │   │       │   │         bookingDateTime: String
+│   │   │       │   │         valueDateTime: String
+│   │   │       │   │         merchantName: String
+│   │   │       │   │         merchantId: String
+│   │   │       │   │         mccCode: int
+│   │   │       │   │         debtorName: String
+│   │   │       │   │         creditorName: String
+│   │   │       │   │
+│   │   │       │   └── mapper/
+│   │   │       │       └── OpenBankingTransactionMapper.java
+│   │   │       │           + toIncomingTransactionCommand(
+│   │   │       │               dto: OpenBankingTransactionDto
+│   │   │       │             ): IncomingTransactionCommand
+│   │   │       │           → преобразует внешний DTO Симулякра в команду
+│   │   │       │              для HandleIncomingTransactionUseCase

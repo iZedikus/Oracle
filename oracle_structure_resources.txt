@@ -1,0 +1,210 @@
+oracle/
+│
+├── pom.xml
+│
+├── src/
+│   ├── main/
+│   │   └── resources/
+│   │       │
+│   │       ├── application.properties                           ← основной конфиг
+│   │       │   spring:
+│   │       │     datasource:
+│   │       │       url: jdbc:postgresql://localhost:5434/oracle
+│   │       │     jpa:
+│   │       │       hibernate.ddl-auto: validate
+│   │       │     rabbitmq:
+│   │       │       host: localhost
+│   │       │       port: 5672
+│   │       │     flyway:
+│   │       │       schemas: oracle
+│   │       │   management.endpoints.web.exposure.include: health,info,metrics
+│   │       │
+│   │       ├── application-dev.yml                      ← dev-профиль
+│   │       │   (переопределяет datasource, rabbitmq для локальной среды)
+│   │       │
+│   │       └── db/migration/                            ← Flyway миграции (schema: oracle)
+│   │           │
+│   │           ├── V1__create_schema.sql
+│   │           │   CREATE SCHEMA IF NOT EXISTS oracle;
+│   │           │
+│   │           ├── V2__create_watch_profile_tables.sql
+│   │           │   CREATE TABLE oracle.watch_profile (
+│   │           │     watch_profile_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     external_user_id    UUID NOT NULL,
+│   │           │     watch_profile_status VARCHAR(20) NOT NULL,
+│   │           │     registered_at       TIMESTAMP NOT NULL,
+│   │           │     updated_at          TIMESTAMP NOT NULL,
+│   │           │     last_event_at       TIMESTAMP
+│   │           │   );
+│   │           │
+│   │           │   CREATE TABLE oracle.active_rule (
+│   │           │     active_rule_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     watch_profile_id          UUID NOT NULL
+│   │           │         REFERENCES oracle.watch_profile(watch_profile_id),
+│   │           │     external_user_scenario_id UUID NOT NULL UNIQUE,
+│   │           │     scenario_type_code        VARCHAR(60) NOT NULL,
+│   │           │     version                   INT NOT NULL,
+│   │           │     is_enabled                BOOLEAN NOT NULL DEFAULT TRUE,
+│   │           │     registered_at             TIMESTAMP NOT NULL,
+│   │           │     updated_at                TIMESTAMP NOT NULL
+│   │           │   );
+│   │           │
+│   │           │   CREATE TABLE oracle.rule_condition (
+│   │           │     condition_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     active_rule_id  UUID NOT NULL
+│   │           │         REFERENCES oracle.active_rule(active_rule_id)
+│   │           │         ON DELETE CASCADE,
+│   │           │     field           VARCHAR(40) NOT NULL,
+│   │           │     operator        VARCHAR(20) NOT NULL,
+│   │           │     value           TEXT NOT NULL
+│   │           │   );
+│   │           │
+│   │           ├── V3__create_incoming_transaction_table.sql
+│   │           │   CREATE TABLE oracle.incoming_transaction (
+│   │           │     incoming_transaction_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     external_transaction_id VARCHAR(255) NOT NULL UNIQUE,
+│   │           │     watch_profile_id         UUID
+│   │           │         REFERENCES oracle.watch_profile(watch_profile_id),
+│   │           │     status                   VARCHAR(20) NOT NULL,
+│   │           │     received_at              TIMESTAMP NOT NULL,
+│   │           │     processed_at             TIMESTAMP,
+│   │           │     -- TransactionData (embedded)
+│   │           │     credit_debit_indicator   VARCHAR(10),
+│   │           │     mcc                      VARCHAR(10),
+│   │           │     merchant_name            VARCHAR(140),
+│   │           │     merchant_id              VARCHAR(60),
+│   │           │     amount                   VARCHAR(30),
+│   │           │     currency                 CHAR(3),
+│   │           │     booking_date_time        TIMESTAMP,
+│   │           │     value_date_time          TIMESTAMP
+│   │           │   );
+│   │           │
+│   │           ├── V4__create_match_attempt_table.sql
+│   │           │   CREATE TABLE oracle.match_attempt (
+│   │           │     match_attempt_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     incoming_transaction_id  UUID NOT NULL
+│   │           │         REFERENCES oracle.incoming_transaction(incoming_transaction_id),
+│   │           │     watch_account_id         UUID NOT NULL,
+│   │           │     result                   VARCHAR(20) NOT NULL,
+│   │           │     attempted_at             TIMESTAMP NOT NULL
+│   │           │   );
+│   │           │
+│   │           │   CREATE TABLE oracle.condition_snapshot (
+│   │           │     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     match_attempt_id  UUID NOT NULL
+│   │           │         REFERENCES oracle.match_attempt(match_attempt_id)
+│   │           │         ON DELETE CASCADE,
+│   │           │     expected_value    TEXT,
+│   │           │     actual_value      TEXT,
+│   │           │     passed            BOOLEAN NOT NULL
+│   │           │   );
+│   │           │
+│   │           ├── V5__create_trigger_event_table.sql
+│   │           │   CREATE TABLE oracle.trigger_event (
+│   │           │     trigger_event_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     match_attempt_id          UUID NOT NULL
+│   │           │         REFERENCES oracle.match_attempt(match_attempt_id),
+│   │           │     external_user_scenario_id UUID NOT NULL,
+│   │           │     external_user_id          UUID NOT NULL,
+│   │           │     delivery_status           VARCHAR(20) NOT NULL,
+│   │           │     retry_count               INT NOT NULL DEFAULT 0,
+│   │           │     scheduled_at              TIMESTAMP NOT NULL,
+│   │           │     delivered_at              TIMESTAMP,
+│   │           │     last_retry_at             TIMESTAMP,
+│   │           │     -- TriggerPayload (embedded)
+│   │           │     trigger_transaction_id    VARCHAR(255),
+│   │           │     matched_mcc               VARCHAR(10),
+│   │           │     matched_merchant_name     VARCHAR(140),
+│   │           │     matched_amount            VARCHAR(30),
+│   │           │     matched_currency          CHAR(3),
+│   │           │     scenario_type_code        VARCHAR(60),
+│   │           │     occured_at                TIMESTAMP
+│   │           │   );
+│   │           │
+│   │           │   CREATE TABLE oracle.delivery_attempt (
+│   │           │     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+│   │           │     trigger_event_id UUID NOT NULL
+│   │           │         REFERENCES oracle.trigger_event(trigger_event_id)
+│   │           │         ON DELETE CASCADE,
+│   │           │     attempt_number   INT NOT NULL,
+│   │           │     attempted_at     TIMESTAMP NOT NULL,
+│   │           │     success          BOOLEAN NOT NULL,
+│   │           │     http_status      INT,
+│   │           │     error_message    TEXT
+│   │           │   );
+│   │           │
+│   │           └── V6__create_indexes.sql
+│   │               CREATE INDEX idx_incoming_tx_watch_profile
+│   │                   ON oracle.incoming_transaction(watch_profile_id);
+│   │               CREATE INDEX idx_incoming_tx_status
+│   │                   ON oracle.incoming_transaction(status);
+│   │               CREATE INDEX idx_match_attempt_tx_id
+│   │                   ON oracle.match_attempt(incoming_transaction_id);
+│   │               CREATE INDEX idx_trigger_event_status_scheduled
+│   │                   ON oracle.trigger_event(delivery_status, scheduled_at);
+│   │               CREATE INDEX idx_active_rule_scenario_id
+│   │                   ON oracle.active_rule(external_user_scenario_id);
+│   │               CREATE INDEX idx_watch_profile_external_user
+│   │                   ON oracle.watch_profile(external_user_id);
+│   │
+│   └── test/
+│       └── java/
+│           └── ru/example/oracle/
+│               │
+│               ├── domain/
+│               │   ├── IncomingTransactionTest.java
+│               │   │   Проверка инвариантов:
+│               │   │     нельзя вызвать markMatched() без markProcessing() первым;
+│               │   │     нельзя перейти из Matched обратно в Processing и т.д.
+│               │   │
+│               │   ├── MatchAttemptTest.java
+│               │   │   Проверка логики evaluate() для каждого RuleOperator:
+│               │   │     Equals, NonEquals, Contains, In (с запятой как разделителем).
+│               │   │     Проверка корректности ConditionSnapshot (passed/failed).
+│               │   │
+│               │   └── WatchProfileTest.java
+│               │       Проверка инвариантов:
+│               │         pause() на Terminated → исключение;
+│               │         resume() на Active → исключение;
+│               │         findActiveRules() возвращает только isEnabled=true.
+│               │
+│               ├── application/
+│               │   ├── HandleIncomingTransactionUseCaseTest.java
+│               │   │   @ExtendWith(MockitoExtension)
+│               │   │   Моки: WatchProfileRepository, IncomingTransactionRepository,
+│               │   │         MatchAttemptRepository, TriggerEventRepository,
+│               │   │         TriggerEventSenderPort
+│               │   │   Сценарии:
+│               │   │     транзакция совпала → TriggerEvent создан и отправлен;
+│               │   │     транзакция не совпала → markUnmatched(), не отправляем;
+│               │   │     профиль не найден → markUnmatched();
+│               │   │     профиль Paused → пропускаем матчинг.
+│               │   │
+│               │   ├── RegisterWatchProfileUseCaseTest.java
+│               │   │   Дубликат → DuplicateProfileException;
+│               │   │   успешная регистрация → save вызван.
+│               │   │
+│               │   └── RetryTriggerEventUseCaseTest.java
+│               │       Событие exhausted → markFailed;
+│               │       успешная повторная доставка → markDelivered;
+│               │       неудачная повторная доставка → scheduleRetry.
+│               │
+│               └── infrastructure/
+│                   └── web/
+│                       └── AdminControllerTest.java
+│                           @WebMvcTest — только слой контроллера.
+│                           GET /incoming-transactions/{id} → 200 / 404
+│                           GET /match-attempts/{txId} → 200 / 404
+│                           GET /trigger-events/{id} → 200 / 404
+│                           POST /trigger-events/{id}/retry → 200
+│
+└── docker-compose.yml
+    services:
+      oracle-db:
+        image: postgres:16
+        environment: POSTGRES_DB=oracle, POSTGRES_USER, POSTGRES_PASSWORD
+        ports: 5434:5432
+
+      rabbitmq:
+        image: rabbitmq:3-management
+        ports: 5672:5672, 15672:15672
