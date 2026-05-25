@@ -1,0 +1,69 @@
+package ru.stepanov.oracle.domain.model.triggerevent;
+
+import ru.stepanov.oracle.domain.event.DomainEvent;
+import ru.stepanov.oracle.domain.event.TriggerEventDeliveredEvent;
+import ru.stepanov.oracle.domain.event.TriggerEventExhaustedEvent;
+import ru.stepanov.oracle.domain.model.matchattempt.MatchAttempt;
+import ru.stepanov.oracle.domain.model.watchprofile.ActiveRule;
+import ru.stepanov.oracle.domain.model.watchprofile.WatchProfile;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+public class TriggerEvent {
+    private static final int MAX_RETRIES = 3;
+    private final UUID triggerEventID;
+    private final UUID matchAttemptID;
+    private final UUID externalUserScenarioID;
+    private final UUID externalUserID;
+    private TriggerEventDeliveryStatus deliveryStatus;
+    private final TriggerPayload payload;
+    private final List<DeliveryAttempt> deliveryAttempts;
+    private int retryCount;
+    private Instant scheduledAt;
+    private Instant deliveredAt;
+    private Instant lastRetryAt;
+    private final List<DomainEvent> domainEvents = new ArrayList<>();
+
+    private TriggerEvent(UUID triggerEventID, UUID matchAttemptID, UUID externalUserScenarioID, UUID externalUserID,
+                         TriggerEventDeliveryStatus deliveryStatus, TriggerPayload payload, List<DeliveryAttempt> deliveryAttempts,
+                         int retryCount, Instant scheduledAt, Instant deliveredAt, Instant lastRetryAt) {
+        this.triggerEventID = triggerEventID;
+        this.matchAttemptID = matchAttemptID;
+        this.externalUserScenarioID = externalUserScenarioID;
+        this.externalUserID = externalUserID;
+        this.deliveryStatus = deliveryStatus;
+        this.payload = payload;
+        this.deliveryAttempts = deliveryAttempts;
+        this.retryCount = retryCount;
+        this.scheduledAt = scheduledAt;
+        this.deliveredAt = deliveredAt;
+        this.lastRetryAt = lastRetryAt;
+    }
+
+    public static TriggerEvent create(MatchAttempt matchAttempt, WatchProfile watchProfile) {
+        ActiveRule firstRule = watchProfile.getRules().isEmpty() ? null : watchProfile.getRules().getFirst();
+        TriggerPayload payload = new TriggerPayload(
+                matchAttempt.getIncomingTransactionID().toString(), null, null, null, null,
+                firstRule == null ? null : firstRule.getScenarioTypeCode(), Instant.now());
+        return new TriggerEvent(UUID.randomUUID(), matchAttempt.getMatchAttemptID(),
+                firstRule == null ? null : firstRule.getExternalUserScenarioID(), watchProfile.getExternalUserID(),
+                TriggerEventDeliveryStatus.Pending, payload, new ArrayList<>(), 0, Instant.now(), null, null);
+    }
+
+    public void scheduleDelivery() { this.deliveryStatus = TriggerEventDeliveryStatus.Pending; this.scheduledAt = Instant.now(); }
+    public void markDelivered() { this.deliveryStatus = TriggerEventDeliveryStatus.Delivered; this.deliveredAt = Instant.now(); domainEvents.add(new TriggerEventDeliveredEvent(triggerEventID, externalUserScenarioID, deliveredAt)); }
+    public void markFailed(String message) { this.deliveryStatus = TriggerEventDeliveryStatus.Failed; deliveryAttempts.add(new DeliveryAttempt(retryCount + 1, Instant.now(), false, 500, message)); }
+    public void scheduleRetry() { this.retryCount++; this.lastRetryAt = Instant.now(); this.deliveryStatus = TriggerEventDeliveryStatus.Retrying; }
+    public boolean isExhausted() {
+        boolean exhausted = retryCount >= MAX_RETRIES;
+        if (exhausted) {
+            domainEvents.add(new TriggerEventExhaustedEvent(triggerEventID, externalUserScenarioID, Instant.now()));
+        }
+        return exhausted;
+    }
+
+    public List<DomainEvent> pullDomainEvents() { var copy = List.copyOf(domainEvents); domainEvents.clear(); return copy; }
+}
