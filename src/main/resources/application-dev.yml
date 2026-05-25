@@ -1,0 +1,6 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/oracle
+  rabbitmq:
+    host: localhost
+    port: 5672
