@@ -48,10 +48,9 @@ public class HandleIncomingTransactionUseCase {
         IncomingTransaction tx = IncomingTransaction.receive(
                 command.externalTransactionID(),
                 profile != null ? profile.getWatchProfileID() : UUID.randomUUID(),
-                new TransactionData(command.accountId(), command.paymentToken(), command.amount(), command.currency(),
-                        command.creditDebitIndicator(), command.merchantName(), command.merchantId(),
-                        command.mccCode(), command.bookingDateTime(), command.valueDateTime(),
-                        command.debtorName(), command.creditorName())
+                new TransactionData(command.creditDebitIndicator(), command.mccCode(), command.merchantName(),
+                        command.merchantId(), command.amount().toPlainString(), command.currency(),
+                        command.bookingDateTime(), command.valueDateTime())
         );
         incomingTransactionRepository.save(tx);
 
