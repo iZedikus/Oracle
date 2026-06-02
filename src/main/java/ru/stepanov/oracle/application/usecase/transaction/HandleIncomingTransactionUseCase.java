@@ -4,6 +4,7 @@ import org.springframework.stereotype.Service;
 import ru.stepanov.oracle.application.port.TriggerEventSenderPort;
 import ru.stepanov.oracle.application.repository.IncomingTransactionRepository;
 import ru.stepanov.oracle.application.repository.MatchAttemptRepository;
+import ru.stepanov.oracle.application.repository.ProcessingErrorRepository;
 import ru.stepanov.oracle.application.repository.TriggerEventRepository;
 import ru.stepanov.oracle.application.repository.WatchProfileRepository;
 import ru.stepanov.oracle.domain.model.incomingtransaction.CreditDebitCode;
@@ -11,6 +12,8 @@ import ru.stepanov.oracle.domain.model.incomingtransaction.IncomingTransaction;
 import ru.stepanov.oracle.domain.model.incomingtransaction.TransactionData;
 import ru.stepanov.oracle.domain.model.matchattempt.MatchAttempt;
 import ru.stepanov.oracle.domain.model.matchattempt.MatchingResult;
+import ru.stepanov.oracle.domain.model.processingerror.ProcessingError;
+import ru.stepanov.oracle.domain.model.processingerror.ProcessingErrorSource;
 import ru.stepanov.oracle.domain.model.triggerevent.TriggerEvent;
 import ru.stepanov.oracle.domain.model.watchprofile.ActiveRule;
 import ru.stepanov.oracle.domain.model.watchprofile.WatchProfile;
@@ -27,17 +30,20 @@ public class HandleIncomingTransactionUseCase {
     private final MatchAttemptRepository matchAttemptRepository;
     private final TriggerEventRepository triggerEventRepository;
     private final TriggerEventSenderPort triggerEventSenderPort;
+    private final ProcessingErrorRepository processingErrorRepository;
 
     public HandleIncomingTransactionUseCase(IncomingTransactionRepository incomingTransactionRepository,
                                             WatchProfileRepository watchProfileRepository,
                                             MatchAttemptRepository matchAttemptRepository,
                                             TriggerEventRepository triggerEventRepository,
-                                            TriggerEventSenderPort triggerEventSenderPort) {
+                                            TriggerEventSenderPort triggerEventSenderPort,
+                                            ProcessingErrorRepository processingErrorRepository) {
         this.incomingTransactionRepository = incomingTransactionRepository;
         this.watchProfileRepository = watchProfileRepository;
         this.matchAttemptRepository = matchAttemptRepository;
         this.triggerEventRepository = triggerEventRepository;
         this.triggerEventSenderPort = triggerEventSenderPort;
+        this.processingErrorRepository = processingErrorRepository;
     }
 
     public IncomingTransaction execute(IncomingTransactionCommand command) {
@@ -59,32 +65,73 @@ public class HandleIncomingTransactionUseCase {
             return incomingTransactionRepository.save(tx);
         }
 
-        tx.markProcessing();
-        incomingTransactionRepository.save(tx);
+        try {
+            tx.markProcessing();
+            incomingTransactionRepository.save(tx);
 
-        MatchAttempt matchedAttempt = null;
-        ActiveRule matchedRule = null;
-        for (ActiveRule rule : profile.findActiveRules()) {
-            MatchAttempt attempt = MatchAttempt.attempt(tx, rule);
-            matchAttemptRepository.save(attempt);
-            if (attempt.getResult() == MatchingResult.Matched) {
-                matchedAttempt = attempt;
-                matchedRule = rule;
-                break;
+            MatchAttempt matchedAttempt = null;
+            ActiveRule matchedRule = null;
+            for (ActiveRule rule : profile.findActiveRules()) {
+                MatchAttempt attempt = MatchAttempt.attempt(tx, rule);
+                matchAttemptRepository.save(attempt);
+                if (attempt.getResult() == MatchingResult.Matched) {
+                    matchedAttempt = attempt;
+                    matchedRule = rule;
+                    break;
+                }
             }
-        }
 
-        if (matchedAttempt != null && matchedRule != null) {
-            tx.markMatched();
-            TriggerEvent triggerEvent = TriggerEvent.create(matchedAttempt, profile, matchedRule, tx);
-            triggerEvent.scheduleDelivery();
-            triggerEventRepository.save(triggerEvent);
-            triggerEventSenderPort.send(triggerEvent);
-        } else {
-            tx.markUnmatched();
+            if (matchedAttempt != null && matchedRule != null) {
+                tx.markMatched();
+                incomingTransactionRepository.save(tx);
+
+                TriggerEvent triggerEvent = TriggerEvent.create(matchedAttempt, profile, matchedRule, tx);
+                triggerEvent.scheduleDelivery();
+                triggerEventRepository.save(triggerEvent);
+                sendTriggerEvent(triggerEvent, tx);
+            } else {
+                tx.markUnmatched();
+            }
+        } catch (RuntimeException ex) {
+            return handleProcessingFailure(tx, null, ex);
         }
 
         return incomingTransactionRepository.save(tx);
+    }
+
+    private void sendTriggerEvent(TriggerEvent triggerEvent, IncomingTransaction tx) {
+        try {
+            triggerEventSenderPort.send(triggerEvent);
+            triggerEvent.markDelivered();
+            triggerEventRepository.save(triggerEvent);
+        } catch (RuntimeException ex) {
+            handleTriggerSendFailure(triggerEvent, tx, ex);
+        }
+    }
+
+    private void handleTriggerSendFailure(TriggerEvent triggerEvent, IncomingTransaction tx, RuntimeException ex) {
+        String errorMessage = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
+        if (triggerEvent.isExhausted()) {
+            triggerEvent.markFailed(errorMessage);
+        } else {
+            triggerEvent.scheduleRetry();
+        }
+        triggerEventRepository.save(triggerEvent);
+        logError(ProcessingErrorSource.TRIGGER_EVENT_SEND, tx.getExternalTransactionID(), triggerEvent.getTriggerEventID(), errorMessage);
+    }
+
+    private IncomingTransaction handleProcessingFailure(IncomingTransaction tx, UUID triggerEventID, RuntimeException ex) {
+        String errorMessage = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
+        tx.markError(errorMessage);
+        logError(ProcessingErrorSource.TRANSACTION_PROCESSING, tx.getExternalTransactionID(), triggerEventID, errorMessage);
+        return incomingTransactionRepository.save(tx);
+    }
+
+    private void logError(ProcessingErrorSource source,
+                          String externalTransactionID,
+                          UUID triggerEventID,
+                          String message) {
+        processingErrorRepository.save(ProcessingError.record(source, externalTransactionID, triggerEventID, message));
     }
 
     public record IncomingTransactionCommand(
