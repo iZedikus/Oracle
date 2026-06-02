@@ -8,6 +8,8 @@ import ru.stepanov.oracle.application.usecase.profile.TerminateWatchProfileUseCa
 import ru.stepanov.oracle.application.usecase.profile.UpdateWatchProfileRulesUseCase;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleField;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleOperator;
+import ru.stepanov.oracle.domain.model.triggerevent.DebitConfig;
+import ru.stepanov.oracle.infrastructure.messaging.dto.DebitConfigDto;
 import ru.stepanov.oracle.infrastructure.messaging.dto.ProfileSyncMessage;
 
 @Component
@@ -32,7 +34,7 @@ public class ProfileSyncConsumer {
                     message.bankBic, message.ruleVersion,
                     message.rules.stream().map(r -> new RegisterWatchProfileUseCase.RuleConditionDto(
                             RuleField.valueOf(r.field), RuleOperator.valueOf(r.operator), r.value)).toList(),
-                    new RegisterWatchProfileUseCase.DebitConfigDto("from_is")
+                    toDebitConfig(message.debitConfig)
             ));
             case UPDATE_RULES -> update.execute(new UpdateWatchProfileRulesUseCase.UpdateRulesCommand(
                     message.externalUserScenarioId,
@@ -43,5 +45,18 @@ public class ProfileSyncConsumer {
             case PAUSE -> pause.execute(message.externalUserScenarioId);
             case TERMINATE -> terminate.execute(message.externalUserScenarioId);
         }
+    }
+
+    private static DebitConfig toDebitConfig(DebitConfigDto dto) {
+        if (dto == null) {
+            return null;
+        }
+        return new DebitConfig(
+                dto.debitAmount,
+                dto.currency,
+                dto.recipientPaymentToken,
+                dto.consentId,
+                dto.sourceAccountId
+        );
     }
 }

@@ -3,6 +3,7 @@ package ru.stepanov.oracle.application.usecase.profile;
 import org.springframework.stereotype.Service;
 import ru.stepanov.oracle.application.repository.WatchProfileRepository;
 import ru.stepanov.oracle.application.usecase.profile.exception.DuplicateProfileException;
+import ru.stepanov.oracle.domain.model.triggerevent.DebitConfig;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleCondition;
 import ru.stepanov.oracle.domain.model.watchprofile.WatchProfile;
 
@@ -32,7 +33,8 @@ public class RegisterWatchProfileUseCase {
                 command.externalUserScenarioID(),
                 command.scenarioTypeCode(),
                 conditions,
-                command.ruleVersion()
+                command.ruleVersion(),
+                command.debitConfig()
         );
 
         return watchProfileRepository.save(profile);
@@ -46,7 +48,7 @@ public class RegisterWatchProfileUseCase {
             String bankBic,
             int ruleVersion,
             List<RuleConditionDto> rules,
-            DebitConfigDto debitConfig
+            DebitConfig debitConfig
     ) {}
 
     public record RuleConditionDto(
@@ -54,6 +56,4 @@ public class RegisterWatchProfileUseCase {
             ru.stepanov.oracle.domain.model.watchprofile.RuleOperator operator,
             String value
     ) {}
-
-    public record DebitConfigDto(String placeholder) {}
 }

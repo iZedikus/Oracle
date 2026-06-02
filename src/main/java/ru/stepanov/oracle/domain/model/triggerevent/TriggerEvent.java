@@ -3,6 +3,8 @@ package ru.stepanov.oracle.domain.model.triggerevent;
 import ru.stepanov.oracle.domain.event.DomainEvent;
 import ru.stepanov.oracle.domain.event.TriggerEventDeliveredEvent;
 import ru.stepanov.oracle.domain.event.TriggerEventExhaustedEvent;
+import ru.stepanov.oracle.domain.model.incomingtransaction.IncomingTransaction;
+import ru.stepanov.oracle.domain.model.incomingtransaction.TransactionData;
 import ru.stepanov.oracle.domain.model.matchattempt.MatchAttempt;
 import ru.stepanov.oracle.domain.model.watchprofile.ActiveRule;
 import ru.stepanov.oracle.domain.model.watchprofile.WatchProfile;
@@ -43,15 +45,49 @@ public class TriggerEvent {
         this.lastRetryAt = lastRetryAt;
     }
 
-    public static TriggerEvent create(MatchAttempt matchAttempt, WatchProfile watchProfile) {
-        ActiveRule firstRule = watchProfile.getRules().isEmpty() ? null : watchProfile.getRules().getFirst();
+    public static TriggerEvent create(MatchAttempt matchAttempt,
+                                      WatchProfile watchProfile,
+                                      ActiveRule matchedRule,
+                                      IncomingTransaction transaction) {
+        TransactionData data = transaction.getData();
+        Instant occurredAt = Instant.now();
         TriggerPayload payload = new TriggerPayload(
-                matchAttempt.getIncomingTransactionID().toString(), null, null, null, null,
-                firstRule == null ? null : firstRule.getScenarioTypeCode(), Instant.now());
-        return new TriggerEvent(UUID.randomUUID(), matchAttempt.getMatchAttemptID(),
-                firstRule == null ? null : firstRule.getExternalUserScenarioID(), watchProfile.getExternalUserID(),
-                TriggerEventDeliveryStatus.Pending, payload, new ArrayList<>(), 0, Instant.now(), null, null);
+                transaction.getExternalTransactionID(),
+                data.mcc(),
+                data.merchantName(),
+                data.amount(),
+                data.currency(),
+                matchedRule.getScenarioTypeCode(),
+                watchProfile.getDebitConfig(),
+                occurredAt);
+        return new TriggerEvent(
+                UUID.randomUUID(),
+                matchAttempt.getMatchAttemptID(),
+                matchedRule.getExternalUserScenarioID(),
+                watchProfile.getExternalUserID(),
+                TriggerEventDeliveryStatus.Pending,
+                payload,
+                new ArrayList<>(),
+                0,
+                occurredAt,
+                null,
+                null);
     }
+
+    public UUID getTriggerEventID() { return triggerEventID; }
+    public UUID getMatchAttemptID() { return matchAttemptID; }
+    public UUID getExternalUserScenarioID() { return externalUserScenarioID; }
+    public UUID getExternalUserID() { return externalUserID; }
+    public TriggerEventDeliveryStatus getDeliveryStatus() { return deliveryStatus; }
+    public TriggerPayload getPayload() { return payload; }
+    public String getTriggerTransactionId() { return payload.triggerTransactionID(); }
+    public String getMatchedMcc() { return payload.matchedMCC(); }
+    public String getMatchedMerchantName() { return payload.matchedMerchantName(); }
+    public String getMatchedAmount() { return payload.matchedAmount(); }
+    public String getMatchedCurrency() { return payload.matchedCurrency(); }
+    public String getScenarioTypeCode() { return payload.scenarioTypeCode(); }
+    public DebitConfig getDebitConfig() { return payload.debitConfig(); }
+    public Instant getOccurredAt() { return payload.occuredAt(); }
 
     public void scheduleDelivery() { this.deliveryStatus = TriggerEventDeliveryStatus.Pending; this.scheduledAt = Instant.now(); }
     public void markDelivered() { this.deliveryStatus = TriggerEventDeliveryStatus.Delivered; this.deliveredAt = Instant.now(); domainEvents.add(new TriggerEventDeliveredEvent(triggerEventID, externalUserScenarioID, deliveredAt)); }

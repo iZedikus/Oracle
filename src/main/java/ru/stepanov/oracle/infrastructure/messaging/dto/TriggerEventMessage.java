@@ -14,5 +14,7 @@ public record TriggerEventMessage(
         String matchedMerchantName,
         String matchedAmount,
         String matchedCurrency,
-        String scenarioTypeCode
-) {}
+        String scenarioTypeCode,
+        DebitConfigDto debitConfig
+) {
+}

@@ -63,18 +63,20 @@ public class HandleIncomingTransactionUseCase {
         incomingTransactionRepository.save(tx);
 
         MatchAttempt matchedAttempt = null;
+        ActiveRule matchedRule = null;
         for (ActiveRule rule : profile.findActiveRules()) {
             MatchAttempt attempt = MatchAttempt.attempt(tx, rule);
             matchAttemptRepository.save(attempt);
             if (attempt.getResult() == MatchingResult.Matched) {
                 matchedAttempt = attempt;
+                matchedRule = rule;
                 break;
             }
         }
 
-        if (matchedAttempt != null) {
+        if (matchedAttempt != null && matchedRule != null) {
             tx.markMatched();
-            TriggerEvent triggerEvent = TriggerEvent.create(matchedAttempt, profile);
+            TriggerEvent triggerEvent = TriggerEvent.create(matchedAttempt, profile, matchedRule, tx);
             triggerEvent.scheduleDelivery();
             triggerEventRepository.save(triggerEvent);
             triggerEventSenderPort.send(triggerEvent);

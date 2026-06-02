@@ -2,6 +2,7 @@ package ru.stepanov.oracle.domain.model.watchprofile;
 
 import ru.stepanov.oracle.domain.event.DomainEvent;
 import ru.stepanov.oracle.domain.event.WatchProfileRegisteredEvent;
+import ru.stepanov.oracle.domain.model.triggerevent.DebitConfig;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.UUID;
 public class WatchProfile {
     private final UUID watchProfileID;
     private final UUID externalUserID;
+    private final DebitConfig debitConfig;
     private WatchProfileStatus watchProfileStatus;
     private final List<ActiveRule> rules;
     private final Instant registeredAt;
@@ -18,10 +20,11 @@ public class WatchProfile {
     private Instant lastEventAt;
     private final List<DomainEvent> domainEvents = new ArrayList<>();
 
-    private WatchProfile(UUID watchProfileID, UUID externalUserID, WatchProfileStatus watchProfileStatus,
+    private WatchProfile(UUID watchProfileID, UUID externalUserID, DebitConfig debitConfig, WatchProfileStatus watchProfileStatus,
                          List<ActiveRule> rules, Instant registeredAt, Instant updatedAt, Instant lastEventAt) {
         this.watchProfileID = watchProfileID;
         this.externalUserID = externalUserID;
+        this.debitConfig = debitConfig;
         this.watchProfileStatus = watchProfileStatus;
         this.rules = new ArrayList<>(rules);
         this.registeredAt = registeredAt;
@@ -30,10 +33,11 @@ public class WatchProfile {
     }
 
     public static WatchProfile create(UUID externalUserID, UUID externalUserScenarioID,
-                                      String scenarioTypeCode, List<RuleCondition> rules, int ruleVersion) {
+                                      String scenarioTypeCode, List<RuleCondition> rules, int ruleVersion,
+                                      DebitConfig debitConfig) {
         ActiveRule activeRule = new ActiveRule(UUID.randomUUID(), externalUserScenarioID, scenarioTypeCode,
                 ruleVersion, true, rules, Instant.now(), Instant.now());
-        WatchProfile profile = new WatchProfile(UUID.randomUUID(), externalUserID, WatchProfileStatus.Active,
+        WatchProfile profile = new WatchProfile(UUID.randomUUID(), externalUserID, debitConfig, WatchProfileStatus.Active,
                 List.of(activeRule), Instant.now(), Instant.now(), null);
         profile.domainEvents.add(new WatchProfileRegisteredEvent(profile.watchProfileID, externalUserID, Instant.now()));
         return profile;
@@ -54,6 +58,7 @@ public class WatchProfile {
 
     public UUID getWatchProfileID() { return watchProfileID; }
     public UUID getExternalUserID() { return externalUserID; }
+    public DebitConfig getDebitConfig() { return debitConfig; }
     public WatchProfileStatus getWatchProfileStatus() { return watchProfileStatus; }
     public List<ActiveRule> getRules() { return List.copyOf(rules); }
     public Instant getRegisteredAt() { return registeredAt; }

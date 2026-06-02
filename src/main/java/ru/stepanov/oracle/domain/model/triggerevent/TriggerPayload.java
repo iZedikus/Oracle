@@ -8,5 +8,6 @@ public record TriggerPayload(String triggerTransactionID,
                              String matchedAmount,
                              String matchedCurrency,
                              String scenarioTypeCode,
+                             DebitConfig debitConfig,
                              Instant occuredAt) {
 }
