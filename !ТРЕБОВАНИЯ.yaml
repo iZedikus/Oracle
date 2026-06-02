@@ -1,0 +1,60 @@
+# Требования к сервису ORACLE, соответствующие контракту
+# (асинхронные через RabbitMQ + внутренняя обработка)
+
+requirements:
+  - id: RQ-ORACLE-01
+    actor: "Непосредственно оракул (автономная логика)"
+    title: "Получение транзакции от Симулякра"
+    implementation: |
+      ORACLE потребляет сообщение TransactionCreatedMessage из RabbitMQ,
+      публикуемое SIMULACRUM после генерации тестовой транзакции.
+    contract_ref: "rabbitmq_contract.yaml (MSG-001)"
+
+  - id: RQ-ORACLE-02
+    actor: "Непосредственно оракул"
+    title: "Классификация транзакции по MCC и иным параметрам"
+    implementation: |
+      Внутренняя логика ORACLE анализирует поля transaction:
+      mccCode, merchantName, amount, creditDebitIndicator и др.
+    contract_ref: "внутренняя спецификация правил (не REST)"
+
+  - id: RQ-ORACLE-03
+    actor: "Непосредственно оракул"
+    title: "Сопоставление транзакции с активными сценариями пользователя"
+    implementation: |
+      ORACLE хранит WatchProfile и ActiveRule, синхронизируемые через
+      ProfileSyncMessage от IS. При получении транзакции проверяет её
+      против активных правил для данного счёта/пользователя.
+    contract_ref: "rabbitmq_contract.yaml (MSG-002)"
+
+  - id: RQ-ORACLE-04
+    actor: "Непосредственно оракул"
+    title: "Фиксация срабатывания сценария"
+    implementation: |
+      При совпадении транзакции с правилом ORACLE регистрирует факт
+      срабатывания во внутреннем журнале (без REST API для просмотра).
+    contract_ref: "логирование внутри сервиса"
+
+  - id: RQ-ORACLE-05
+    actor: "Непосредственно оракул"
+    title: "Отправка триггера в ИС"
+    implementation: |
+      ORACLE публикует TriggerEventMessage в RabbitMQ для IS.
+      IS потребляет его и инициирует списание через SIMULACRUM.
+    contract_ref: "rabbitmq_contract.yaml (сообщение TriggerEventMessage)"
+
+  - id: RQ-ORACLE-06
+    actor: "Непосредственно оракул"
+    title: "Логирование обработанных транзакций"
+    implementation: |
+      Все транзакции (независимо от результата сопоставления) сохраняются
+      во внутренний журнал. REST-просмотр для администратора не предусмотрен.
+    contract_ref: "внутреннее логирование (No REST endpoint)"
+
+  - id: RQ-ORACLE-07
+    actor: "Непосредственно оракул"
+    title: "Логирование ошибок обработки"
+    implementation: |
+      Ошибки классификации, сбои при отправке триггера и т.п. фиксируются
+      в отдельном журнале ошибок (без внешнего API).
+    contract_ref: "внутреннее логирование (No REST endpoint)"

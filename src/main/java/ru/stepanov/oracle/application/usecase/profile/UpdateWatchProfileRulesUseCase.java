@@ -28,7 +28,7 @@ public class UpdateWatchProfileRulesUseCase {
                 .orElseThrow(() -> new WatchProfileNotFoundException(command.externalUserScenarioID()));
 
         List<RuleCondition> conditions = command.rules().stream()
-                .map(dto -> new RuleCondition(dto.field(), dto.operator(), dto.value()))
+                .map(dto -> new RuleCondition(UUID.randomUUID(), dto.field(), dto.operator(), dto.value()))
                 .toList();
         activeRule.updateConditions(conditions, command.ruleVersion());
         profile.updateRule(activeRule);

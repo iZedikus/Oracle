@@ -24,7 +24,7 @@ public class RegisterWatchProfileUseCase {
                 });
 
         List<RuleCondition> conditions = command.rules().stream()
-                .map(dto -> new RuleCondition(dto.field(), dto.operator(), dto.value()))
+                .map(dto -> new RuleCondition(UUID.randomUUID(), dto.field(), dto.operator(), dto.value()))
                 .toList();
 
         WatchProfile profile = WatchProfile.create(
