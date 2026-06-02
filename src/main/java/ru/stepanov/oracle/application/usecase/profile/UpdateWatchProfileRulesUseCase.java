@@ -3,6 +3,7 @@ package ru.stepanov.oracle.application.usecase.profile;
 import org.springframework.stereotype.Service;
 import ru.stepanov.oracle.application.repository.WatchProfileRepository;
 import ru.stepanov.oracle.application.usecase.profile.exception.WatchProfileNotFoundException;
+import ru.stepanov.oracle.domain.model.triggerevent.DebitConfig;
 import ru.stepanov.oracle.domain.model.watchprofile.ActiveRule;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleCondition;
 import ru.stepanov.oracle.domain.model.watchprofile.WatchProfile;
@@ -32,11 +33,17 @@ public class UpdateWatchProfileRulesUseCase {
                 .toList();
         activeRule.updateConditions(conditions, command.ruleVersion());
         profile.updateRule(activeRule);
+        profile.updateDebitConfig(command.debitConfig());
 
         return watchProfileRepository.save(profile);
     }
 
-    public record UpdateRulesCommand(UUID externalUserScenarioID, int ruleVersion, List<RuleConditionDto> rules) {}
+    public record UpdateRulesCommand(
+            UUID externalUserScenarioID,
+            int ruleVersion,
+            List<RuleConditionDto> rules,
+            DebitConfig debitConfig
+    ) {}
 
     public record RuleConditionDto(
             ru.stepanov.oracle.domain.model.watchprofile.RuleField field,

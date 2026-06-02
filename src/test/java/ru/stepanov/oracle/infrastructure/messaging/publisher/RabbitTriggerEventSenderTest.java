@@ -56,6 +56,8 @@ class RabbitTriggerEventSenderTest {
                 externalUserId,
                 externalUserScenarioId,
                 "UNDESIRABLE_PURCHASE",
+                "token-abc-xyz",
+                null,
                 List.of(new RuleCondition(UUID.randomUUID(), RuleField.MCC, RuleOperator.In, "5912")),
                 1,
                 debitConfig

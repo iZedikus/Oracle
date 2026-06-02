@@ -32,12 +32,12 @@ public class InMemoryWatchProfileRepository implements WatchProfileRepository {
     @Override
     public Optional<WatchProfile> findByPaymentTokenOrAccountID(String paymentToken, String accountID) {
         return profilesByScenarioID.values().stream()
-                .filter(profile -> profile.getRules().stream().anyMatch(rule ->
-                        rule.getConditions().stream().anyMatch(condition ->
-                                paymentToken != null && paymentToken.equals(condition.value())
-                                        || accountID != null && accountID.equals(condition.value())
-                        )
-                ))
+                .filter(profile -> matchesPaymentTokenOrAccountId(profile, paymentToken, accountID))
                 .findFirst();
+    }
+
+    private static boolean matchesPaymentTokenOrAccountId(WatchProfile profile, String paymentToken, String accountID) {
+        return paymentToken != null && paymentToken.equals(profile.getPaymentToken())
+                || accountID != null && accountID.equals(profile.getAccountId());
     }
 }

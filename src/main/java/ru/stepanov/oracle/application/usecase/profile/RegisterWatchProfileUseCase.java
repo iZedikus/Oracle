@@ -32,6 +32,8 @@ public class RegisterWatchProfileUseCase {
                 command.externalUserID(),
                 command.externalUserScenarioID(),
                 command.scenarioTypeCode(),
+                command.paymentToken(),
+                command.accountId(),
                 conditions,
                 command.ruleVersion(),
                 command.debitConfig()
@@ -45,6 +47,7 @@ public class RegisterWatchProfileUseCase {
             UUID externalUserScenarioID,
             String scenarioTypeCode,
             String paymentToken,
+            String accountId,
             String bankBic,
             int ruleVersion,
             List<RuleConditionDto> rules,

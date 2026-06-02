@@ -31,7 +31,7 @@ public class ProfileSyncConsumer {
         switch (message.action) {
             case REGISTER -> register.execute(new RegisterWatchProfileUseCase.RegisterWatchProfileCommand(
                     message.externalUserId, message.externalUserScenarioId, message.scenarioTypeCode, message.paymentToken,
-                    message.bankBic, message.ruleVersion,
+                    null, message.bankBic, message.ruleVersion,
                     message.rules.stream().map(r -> new RegisterWatchProfileUseCase.RuleConditionDto(
                             RuleField.valueOf(r.field), RuleOperator.valueOf(r.operator), r.value)).toList(),
                     toDebitConfig(message.debitConfig)
@@ -40,7 +40,8 @@ public class ProfileSyncConsumer {
                     message.externalUserScenarioId,
                     message.ruleVersion,
                     message.rules.stream().map(r -> new UpdateWatchProfileRulesUseCase.RuleConditionDto(
-                            RuleField.valueOf(r.field), RuleOperator.valueOf(r.operator), r.value)).toList()
+                            RuleField.valueOf(r.field), RuleOperator.valueOf(r.operator), r.value)).toList(),
+                    toDebitConfig(message.debitConfig)
             ));
             case PAUSE -> pause.execute(message.externalUserScenarioId);
             case TERMINATE -> terminate.execute(message.externalUserScenarioId);
