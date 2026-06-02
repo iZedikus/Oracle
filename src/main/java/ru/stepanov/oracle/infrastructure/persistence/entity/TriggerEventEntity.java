@@ -38,8 +38,8 @@ public class TriggerEventEntity {
     @Column(name = "scheduled_at", nullable = false)
     private Instant scheduledAt;
 
-    @Column(name = "delivered_at")
-    private Instant deliveredAt;
+    @Column(name = "published_at")
+    private Instant publishedAt;
 
     @Column(name = "last_retry_at")
     private Instant lastRetryAt;
@@ -97,8 +97,8 @@ public class TriggerEventEntity {
     public void setRetryCount(int retryCount) { this.retryCount = retryCount; }
     public Instant getScheduledAt() { return scheduledAt; }
     public void setScheduledAt(Instant scheduledAt) { this.scheduledAt = scheduledAt; }
-    public Instant getDeliveredAt() { return deliveredAt; }
-    public void setDeliveredAt(Instant deliveredAt) { this.deliveredAt = deliveredAt; }
+    public Instant getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(Instant publishedAt) { this.publishedAt = publishedAt; }
     public Instant getLastRetryAt() { return lastRetryAt; }
     public void setLastRetryAt(Instant lastRetryAt) { this.lastRetryAt = lastRetryAt; }
     public String getTriggerTransactionId() { return triggerTransactionId; }

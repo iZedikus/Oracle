@@ -6,6 +6,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import ru.stepanov.oracle.domain.model.incomingtransaction.CreditDebitCode;
 import ru.stepanov.oracle.domain.model.incomingtransaction.IncomingTransaction;
@@ -26,7 +27,9 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -82,13 +85,27 @@ class RabbitTriggerEventSenderTest {
         MatchAttempt matchAttempt = MatchAttempt.attempt(transaction, matchedRule);
         TriggerEvent triggerEvent = TriggerEvent.create(matchAttempt, profile, matchedRule, transaction);
 
+        doAnswer(invocation -> {
+            CorrelationData correlationData = invocation.getArgument(3, CorrelationData.class);
+            @SuppressWarnings("deprecation")
+            CorrelationData.Confirm ack = org.mockito.Mockito.mock(CorrelationData.Confirm.class);
+            org.mockito.Mockito.when(ack.isAck()).thenReturn(true);
+            correlationData.getFuture().complete(ack);
+            return null;
+        }).when(rabbitTemplate).convertAndSend(
+                eq("oracle.events"),
+                eq("trigger.matched"),
+                any(TriggerEventMessage.class),
+                any(CorrelationData.class));
+
         sender.send(triggerEvent);
 
         ArgumentCaptor<TriggerEventMessage> messageCaptor = ArgumentCaptor.forClass(TriggerEventMessage.class);
         verify(rabbitTemplate).convertAndSend(
                 eq("oracle.events"),
                 eq("trigger.matched"),
-                messageCaptor.capture()
+                messageCaptor.capture(),
+                any(CorrelationData.class)
         );
 
         TriggerEventMessage message = messageCaptor.getValue();

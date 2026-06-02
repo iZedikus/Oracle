@@ -1,7 +1,7 @@
 package ru.stepanov.oracle.application.usecase.transaction;
 
 import org.springframework.stereotype.Service;
-import ru.stepanov.oracle.application.port.TriggerEventSenderPort;
+import ru.stepanov.oracle.application.service.TriggerEventPublicationService;
 import ru.stepanov.oracle.application.repository.IncomingTransactionRepository;
 import ru.stepanov.oracle.application.repository.MatchAttemptRepository;
 import ru.stepanov.oracle.application.repository.ProcessingErrorRepository;
@@ -29,20 +29,20 @@ public class HandleIncomingTransactionUseCase {
     private final WatchProfileRepository watchProfileRepository;
     private final MatchAttemptRepository matchAttemptRepository;
     private final TriggerEventRepository triggerEventRepository;
-    private final TriggerEventSenderPort triggerEventSenderPort;
+    private final TriggerEventPublicationService triggerEventPublicationService;
     private final ProcessingErrorRepository processingErrorRepository;
 
     public HandleIncomingTransactionUseCase(IncomingTransactionRepository incomingTransactionRepository,
                                             WatchProfileRepository watchProfileRepository,
                                             MatchAttemptRepository matchAttemptRepository,
                                             TriggerEventRepository triggerEventRepository,
-                                            TriggerEventSenderPort triggerEventSenderPort,
+                                            TriggerEventPublicationService triggerEventPublicationService,
                                             ProcessingErrorRepository processingErrorRepository) {
         this.incomingTransactionRepository = incomingTransactionRepository;
         this.watchProfileRepository = watchProfileRepository;
         this.matchAttemptRepository = matchAttemptRepository;
         this.triggerEventRepository = triggerEventRepository;
-        this.triggerEventSenderPort = triggerEventSenderPort;
+        this.triggerEventPublicationService = triggerEventPublicationService;
         this.processingErrorRepository = processingErrorRepository;
     }
 
@@ -100,24 +100,14 @@ public class HandleIncomingTransactionUseCase {
     }
 
     private void sendTriggerEvent(TriggerEvent triggerEvent, IncomingTransaction tx) {
-        try {
-            triggerEventSenderPort.send(triggerEvent);
-            triggerEvent.markDelivered();
-            triggerEventRepository.save(triggerEvent);
-        } catch (RuntimeException ex) {
-            handleTriggerSendFailure(triggerEvent, tx, ex);
-        }
-    }
-
-    private void handleTriggerSendFailure(TriggerEvent triggerEvent, IncomingTransaction tx, RuntimeException ex) {
-        String errorMessage = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
-        if (triggerEvent.isExhausted()) {
-            triggerEvent.markFailed(errorMessage);
-        } else {
-            triggerEvent.scheduleRetry();
+        if (!triggerEventPublicationService.publish(triggerEvent)) {
+            String errorMessage = triggerEvent.getDeliveryAttempts().isEmpty()
+                    ? "Trigger publish failed"
+                    : triggerEvent.getDeliveryAttempts().getLast().errorMessage();
+            logError(ProcessingErrorSource.TRIGGER_EVENT_SEND, tx.getExternalTransactionID(),
+                    triggerEvent.getTriggerEventID(), errorMessage);
         }
         triggerEventRepository.save(triggerEvent);
-        logError(ProcessingErrorSource.TRIGGER_EVENT_SEND, tx.getExternalTransactionID(), triggerEvent.getTriggerEventID(), errorMessage);
     }
 
     private IncomingTransaction handleProcessingFailure(IncomingTransaction tx, UUID triggerEventID, RuntimeException ex) {

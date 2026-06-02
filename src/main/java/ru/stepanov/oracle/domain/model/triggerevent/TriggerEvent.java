@@ -1,8 +1,8 @@
 package ru.stepanov.oracle.domain.model.triggerevent;
 
 import ru.stepanov.oracle.domain.event.DomainEvent;
-import ru.stepanov.oracle.domain.event.TriggerEventDeliveredEvent;
 import ru.stepanov.oracle.domain.event.TriggerEventExhaustedEvent;
+import ru.stepanov.oracle.domain.event.TriggerEventPublishedEvent;
 import ru.stepanov.oracle.domain.model.incomingtransaction.IncomingTransaction;
 import ru.stepanov.oracle.domain.model.incomingtransaction.TransactionData;
 import ru.stepanov.oracle.domain.model.matchattempt.MatchAttempt;
@@ -25,13 +25,13 @@ public class TriggerEvent {
     private final List<DeliveryAttempt> deliveryAttempts;
     private int retryCount;
     private Instant scheduledAt;
-    private Instant deliveredAt;
+    private Instant publishedAt;
     private Instant lastRetryAt;
     private final List<DomainEvent> domainEvents = new ArrayList<>();
 
     private TriggerEvent(UUID triggerEventID, UUID matchAttemptID, UUID externalUserScenarioID, UUID externalUserID,
                          TriggerEventDeliveryStatus deliveryStatus, TriggerPayload payload, List<DeliveryAttempt> deliveryAttempts,
-                         int retryCount, Instant scheduledAt, Instant deliveredAt, Instant lastRetryAt) {
+                         int retryCount, Instant scheduledAt, Instant publishedAt, Instant lastRetryAt) {
         this.triggerEventID = triggerEventID;
         this.matchAttemptID = matchAttemptID;
         this.externalUserScenarioID = externalUserScenarioID;
@@ -41,7 +41,7 @@ public class TriggerEvent {
         this.deliveryAttempts = deliveryAttempts;
         this.retryCount = retryCount;
         this.scheduledAt = scheduledAt;
-        this.deliveredAt = deliveredAt;
+        this.publishedAt = publishedAt;
         this.lastRetryAt = lastRetryAt;
     }
 
@@ -54,12 +54,12 @@ public class TriggerEvent {
                                        List<DeliveryAttempt> deliveryAttempts,
                                        int retryCount,
                                        Instant scheduledAt,
-                                       Instant deliveredAt,
+                                       Instant publishedAt,
                                        Instant lastRetryAt) {
         return new TriggerEvent(
                 triggerEventID, matchAttemptID, externalUserScenarioID, externalUserID,
                 deliveryStatus, payload, new ArrayList<>(deliveryAttempts),
-                retryCount, scheduledAt, deliveredAt, lastRetryAt);
+                retryCount, scheduledAt, publishedAt, lastRetryAt);
     }
 
     public static TriggerEvent create(MatchAttempt matchAttempt,
@@ -107,21 +107,51 @@ public class TriggerEvent {
     public Instant getOccurredAt() { return payload.occuredAt(); }
     public int getRetryCount() { return retryCount; }
     public Instant getScheduledAt() { return scheduledAt; }
-    public Instant getDeliveredAt() { return deliveredAt; }
+    public Instant getPublishedAt() { return publishedAt; }
     public Instant getLastRetryAt() { return lastRetryAt; }
     public List<DeliveryAttempt> getDeliveryAttempts() { return List.copyOf(deliveryAttempts); }
 
-    public void scheduleDelivery() { this.deliveryStatus = TriggerEventDeliveryStatus.Pending; this.scheduledAt = Instant.now(); }
-    public void markDelivered() { this.deliveryStatus = TriggerEventDeliveryStatus.Delivered; this.deliveredAt = Instant.now(); domainEvents.add(new TriggerEventDeliveredEvent(triggerEventID, externalUserScenarioID, deliveredAt)); }
-    public void markFailed(String message) { this.deliveryStatus = TriggerEventDeliveryStatus.Failed; deliveryAttempts.add(new DeliveryAttempt(retryCount + 1, Instant.now(), false, 500, message)); }
-    public void scheduleRetry() { this.retryCount++; this.lastRetryAt = Instant.now(); this.deliveryStatus = TriggerEventDeliveryStatus.Retrying; }
-    public boolean isExhausted() {
-        boolean exhausted = retryCount >= MAX_RETRIES;
-        if (exhausted) {
-            domainEvents.add(new TriggerEventExhaustedEvent(triggerEventID, externalUserScenarioID, Instant.now()));
-        }
-        return exhausted;
+    public void scheduleDelivery() {
+        this.deliveryStatus = TriggerEventDeliveryStatus.Pending;
+        this.scheduledAt = Instant.now();
     }
 
-    public List<DomainEvent> pullDomainEvents() { var copy = List.copyOf(domainEvents); domainEvents.clear(); return copy; }
+    public void markPublished() {
+        Instant at = Instant.now();
+        this.deliveryStatus = TriggerEventDeliveryStatus.Published;
+        this.publishedAt = at;
+        deliveryAttempts.add(new DeliveryAttempt(nextAttemptNumber(), at, true, 200, null));
+        domainEvents.add(new TriggerEventPublishedEvent(triggerEventID, externalUserScenarioID, at));
+    }
+
+    public void registerPublishFailure(String message) {
+        deliveryAttempts.add(new DeliveryAttempt(nextAttemptNumber(), Instant.now(), false, 500, message));
+        if (isExhausted()) {
+            this.deliveryStatus = TriggerEventDeliveryStatus.Failed;
+            domainEvents.add(new TriggerEventExhaustedEvent(triggerEventID, externalUserScenarioID, Instant.now()));
+        } else {
+            this.retryCount++;
+            this.lastRetryAt = Instant.now();
+            this.deliveryStatus = TriggerEventDeliveryStatus.Retrying;
+        }
+    }
+
+    public void markFailed(String message) {
+        this.deliveryStatus = TriggerEventDeliveryStatus.Failed;
+        deliveryAttempts.add(new DeliveryAttempt(nextAttemptNumber(), Instant.now(), false, 500, message));
+    }
+
+    public boolean isExhausted() {
+        return retryCount >= MAX_RETRIES;
+    }
+
+    public List<DomainEvent> pullDomainEvents() {
+        var copy = List.copyOf(domainEvents);
+        domainEvents.clear();
+        return copy;
+    }
+
+    private int nextAttemptNumber() {
+        return deliveryAttempts.size() + 1;
+    }
 }

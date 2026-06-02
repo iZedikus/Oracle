@@ -1,19 +1,19 @@
 package ru.stepanov.oracle.application.usecase.triggerevent;
 
 import org.springframework.stereotype.Service;
-import ru.stepanov.oracle.application.port.TriggerEventSenderPort;
 import ru.stepanov.oracle.application.repository.TriggerEventRepository;
+import ru.stepanov.oracle.application.service.TriggerEventPublicationService;
 import ru.stepanov.oracle.domain.model.triggerevent.TriggerEvent;
 
 @Service
 public class RetryTriggerEventUseCase {
     private final TriggerEventRepository triggerEventRepository;
-    private final TriggerEventSenderPort triggerEventSenderPort;
+    private final TriggerEventPublicationService triggerEventPublicationService;
 
     public RetryTriggerEventUseCase(TriggerEventRepository triggerEventRepository,
-                                    TriggerEventSenderPort triggerEventSenderPort) {
+                                    TriggerEventPublicationService triggerEventPublicationService) {
         this.triggerEventRepository = triggerEventRepository;
-        this.triggerEventSenderPort = triggerEventSenderPort;
+        this.triggerEventPublicationService = triggerEventPublicationService;
     }
 
     public void execute() {
@@ -21,12 +21,7 @@ public class RetryTriggerEventUseCase {
             if (event.isExhausted()) {
                 event.markFailed("Retry limit exhausted");
             } else {
-                try {
-                    triggerEventSenderPort.send(event);
-                    event.markDelivered();
-                } catch (RuntimeException ex) {
-                    event.scheduleRetry();
-                }
+                triggerEventPublicationService.publish(event);
             }
             triggerEventRepository.save(event);
         }

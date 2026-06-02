@@ -168,7 +168,7 @@ public class PersistenceMapper {
         entity.setDeliveryStatus(event.getDeliveryStatus().name());
         entity.setRetryCount(event.getRetryCount());
         entity.setScheduledAt(event.getScheduledAt());
-        entity.setDeliveredAt(event.getDeliveredAt());
+        entity.setPublishedAt(event.getPublishedAt());
         entity.setLastRetryAt(event.getLastRetryAt());
 
         TriggerPayload payload = event.getPayload();
@@ -226,7 +226,7 @@ public class PersistenceMapper {
                 attempts,
                 entity.getRetryCount(),
                 entity.getScheduledAt(),
-                entity.getDeliveredAt(),
+                entity.getPublishedAt(),
                 entity.getLastRetryAt()
         );
     }

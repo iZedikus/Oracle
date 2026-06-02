@@ -7,6 +7,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.stepanov.oracle.application.port.TriggerEventSenderPort;
+import ru.stepanov.oracle.application.service.TriggerEventPublicationService;
 import ru.stepanov.oracle.application.repository.IncomingTransactionRepository;
 import ru.stepanov.oracle.application.repository.MatchAttemptRepository;
 import ru.stepanov.oracle.application.repository.ProcessingErrorRepository;
@@ -19,7 +20,6 @@ import ru.stepanov.oracle.domain.model.processingerror.ProcessingError;
 import ru.stepanov.oracle.domain.model.processingerror.ProcessingErrorSource;
 import ru.stepanov.oracle.domain.model.triggerevent.DebitConfig;
 import ru.stepanov.oracle.domain.model.triggerevent.TriggerEvent;
-import ru.stepanov.oracle.domain.model.triggerevent.TriggerEventDeliveryStatus;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleCondition;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleField;
 import ru.stepanov.oracle.domain.model.watchprofile.RuleOperator;
@@ -56,19 +56,19 @@ class HandleIncomingTransactionUseCaseTest {
 
     private HandleIncomingTransactionUseCase useCase;
     private InMemoryWatchProfileRepository profileStore;
-
     @BeforeEach
     void setUp() {
         IncomingTransactionRepository incomingTransactionRepository = new InMemoryIncomingTransactionRepository();
         MatchAttemptRepository matchAttemptRepository = new InMemoryMatchAttemptRepository();
         TriggerEventRepository triggerEventRepository = new InMemoryTriggerEventRepository();
         profileStore = new InMemoryWatchProfileRepository();
+        TriggerEventPublicationService publicationService = new TriggerEventPublicationService(triggerEventSenderPort);
         useCase = new HandleIncomingTransactionUseCase(
                 incomingTransactionRepository,
                 watchProfileRepository,
                 matchAttemptRepository,
                 triggerEventRepository,
-                triggerEventSenderPort,
+                publicationService,
                 processingErrorRepository
         );
     }
@@ -103,7 +103,7 @@ class HandleIncomingTransactionUseCaseTest {
                 watchProfileRepository,
                 failingMatchAttemptRepository,
                 new InMemoryTriggerEventRepository(),
-                triggerEventSenderPort,
+                new TriggerEventPublicationService(triggerEventSenderPort),
                 processingErrorRepository
         );
 

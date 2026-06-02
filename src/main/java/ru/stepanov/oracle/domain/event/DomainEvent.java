@@ -3,7 +3,7 @@ package ru.stepanov.oracle.domain.event;
 import java.time.Instant;
 import java.util.UUID;
 
-public sealed abstract class DomainEvent permits TransactionMatchedEvent, TriggerEventDeliveredEvent, TriggerEventExhaustedEvent, WatchProfileRegisteredEvent {
+public sealed abstract class DomainEvent permits TransactionMatchedEvent, TriggerEventPublishedEvent, TriggerEventExhaustedEvent, WatchProfileRegisteredEvent {
     private final UUID eventID;
     private final Instant occurredAt;
 
