@@ -45,6 +45,23 @@ public class TriggerEvent {
         this.lastRetryAt = lastRetryAt;
     }
 
+    public static TriggerEvent restore(UUID triggerEventID,
+                                       UUID matchAttemptID,
+                                       UUID externalUserScenarioID,
+                                       UUID externalUserID,
+                                       TriggerEventDeliveryStatus deliveryStatus,
+                                       TriggerPayload payload,
+                                       List<DeliveryAttempt> deliveryAttempts,
+                                       int retryCount,
+                                       Instant scheduledAt,
+                                       Instant deliveredAt,
+                                       Instant lastRetryAt) {
+        return new TriggerEvent(
+                triggerEventID, matchAttemptID, externalUserScenarioID, externalUserID,
+                deliveryStatus, payload, new ArrayList<>(deliveryAttempts),
+                retryCount, scheduledAt, deliveredAt, lastRetryAt);
+    }
+
     public static TriggerEvent create(MatchAttempt matchAttempt,
                                       WatchProfile watchProfile,
                                       ActiveRule matchedRule,
@@ -88,6 +105,11 @@ public class TriggerEvent {
     public String getScenarioTypeCode() { return payload.scenarioTypeCode(); }
     public DebitConfig getDebitConfig() { return payload.debitConfig(); }
     public Instant getOccurredAt() { return payload.occuredAt(); }
+    public int getRetryCount() { return retryCount; }
+    public Instant getScheduledAt() { return scheduledAt; }
+    public Instant getDeliveredAt() { return deliveredAt; }
+    public Instant getLastRetryAt() { return lastRetryAt; }
+    public List<DeliveryAttempt> getDeliveryAttempts() { return List.copyOf(deliveryAttempts); }
 
     public void scheduleDelivery() { this.deliveryStatus = TriggerEventDeliveryStatus.Pending; this.scheduledAt = Instant.now(); }
     public void markDelivered() { this.deliveryStatus = TriggerEventDeliveryStatus.Delivered; this.deliveredAt = Instant.now(); domainEvents.add(new TriggerEventDeliveredEvent(triggerEventID, externalUserScenarioID, deliveredAt)); }

@@ -37,6 +37,21 @@ public class WatchProfile {
         this.lastEventAt = lastEventAt;
     }
 
+    public static WatchProfile restore(UUID watchProfileID,
+                                       UUID externalUserID,
+                                       String paymentToken,
+                                       String accountId,
+                                       DebitConfig debitConfig,
+                                       WatchProfileStatus watchProfileStatus,
+                                       List<ActiveRule> rules,
+                                       Instant registeredAt,
+                                       Instant updatedAt,
+                                       Instant lastEventAt) {
+        return new WatchProfile(
+                watchProfileID, externalUserID, paymentToken, accountId, debitConfig, watchProfileStatus,
+                rules, registeredAt, updatedAt, lastEventAt);
+    }
+
     public static WatchProfile create(UUID externalUserID, UUID externalUserScenarioID,
                                       String scenarioTypeCode, String paymentToken, String accountId,
                                       List<RuleCondition> rules, int ruleVersion,

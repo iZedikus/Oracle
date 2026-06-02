@@ -32,6 +32,21 @@ public class IncomingTransaction {
                 IncomingTransactionStatus.Received, data, Instant.now());
     }
 
+    public static IncomingTransaction restore(UUID incomingTransactionID,
+                                              String externalTransactionID,
+                                              UUID watchProfileID,
+                                              IncomingTransactionStatus status,
+                                              TransactionData data,
+                                              Instant receivedAt,
+                                              Instant processedAt,
+                                              String errorMessage) {
+        IncomingTransaction transaction = new IncomingTransaction(
+                incomingTransactionID, externalTransactionID, watchProfileID, status, data, receivedAt);
+        transaction.processedAt = processedAt;
+        transaction.errorMessage = errorMessage;
+        return transaction;
+    }
+
     public void markProcessing() { this.status = IncomingTransactionStatus.Processing; this.processedAt = Instant.now(); }
     public void markMatched() { this.status = IncomingTransactionStatus.Matched; this.processedAt = Instant.now(); }
     public void markUnmatched() { this.status = IncomingTransactionStatus.Unmatched; this.processedAt = Instant.now(); }

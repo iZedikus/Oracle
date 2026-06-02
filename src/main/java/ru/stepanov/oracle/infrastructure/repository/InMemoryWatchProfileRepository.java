@@ -1,5 +1,6 @@
 package ru.stepanov.oracle.infrastructure.repository;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 import ru.stepanov.oracle.application.repository.WatchProfileRepository;
 import ru.stepanov.oracle.domain.model.watchprofile.WatchProfile;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
+@Profile("test")
 public class InMemoryWatchProfileRepository implements WatchProfileRepository {
     private final Map<UUID, WatchProfile> profilesByScenarioID = new ConcurrentHashMap<>();
 

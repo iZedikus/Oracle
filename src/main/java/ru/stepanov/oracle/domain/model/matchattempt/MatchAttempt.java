@@ -30,6 +30,15 @@ public class MatchAttempt {
         this.attemptedAt = attemptedAt;
     }
 
+    public static MatchAttempt restore(UUID matchAttemptID,
+                                       UUID incomingTransactionID,
+                                       UUID watchAccountID,
+                                       MatchingResult result,
+                                       List<ConditionSnapshot> snapshots,
+                                       Instant attemptedAt) {
+        return new MatchAttempt(matchAttemptID, incomingTransactionID, watchAccountID, result, snapshots, attemptedAt);
+    }
+
     public static MatchAttempt attempt(IncomingTransaction transaction, ActiveRule rule) {
         List<ConditionSnapshot> snapshots = new ArrayList<>();
         boolean allPassed = true;
