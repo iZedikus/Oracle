@@ -49,7 +49,7 @@ public class IncomingTransactionEntity {
     @Column(name = "amount")
     private String amount;
 
-    @Column(name = "currency")
+    @Column(name = "currency", length = 3)
     private String currency;
 
     @Column(name = "booking_date_time")

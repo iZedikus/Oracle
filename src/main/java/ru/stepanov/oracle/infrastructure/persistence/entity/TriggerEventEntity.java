@@ -56,7 +56,7 @@ public class TriggerEventEntity {
     @Column(name = "matched_amount")
     private String matchedAmount;
 
-    @Column(name = "matched_currency")
+    @Column(name = "matched_currency", length = 3)
     private String matchedCurrency;
 
     @Column(name = "scenario_type_code")
@@ -68,7 +68,7 @@ public class TriggerEventEntity {
     @Column(name = "debit_amount")
     private String debitAmount;
 
-    @Column(name = "debit_currency")
+    @Column(name = "debit_currency", length = 3)
     private String debitCurrency;
 
     @Column(name = "recipient_payment_token")

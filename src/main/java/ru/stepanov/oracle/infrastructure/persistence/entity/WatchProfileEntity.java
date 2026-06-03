@@ -44,7 +44,7 @@ public class WatchProfileEntity {
     @Column(name = "debit_amount")
     private String debitAmount;
 
-    @Column(name = "debit_currency")
+    @Column(name = "debit_currency", length = 3)
     private String debitCurrency;
 
     @Column(name = "recipient_payment_token")
